@@ -1,0 +1,87 @@
+{
+  "summary": {
+    "avg_recall_at_k": 1.0,
+    "avg_mrr": 0.8333333333333334,
+    "grounded_rate": 1.0,
+    "unanswerable_handled_rate": 1.0,
+    "avg_retrieval_ms": 421.8,
+    "avg_llm_ms": 5300.4
+  },
+  "results": [
+    {
+      "question_id": "q1",
+      "question": "How many leave days do employees get per year?",
+      "difficulty": "easy",
+      "answer": "According to Source 1 (test_hr.txt) and Source 2 (hr_policy.txt), employees get 20 days of annual leave per year.",
+      "chunks_retrieved": 3,
+      "top_chunk_score": 0.8375267,
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "grounded": true,
+      "unanswerable_handled": null,
+      "retrieval_latency_ms": 580,
+      "llm_latency_ms": 12876,
+      "total_latency_ms": 13456
+    },
+    {
+      "question_id": "q2",
+      "question": "How many sick leave days are employees entitled to?",
+      "difficulty": "easy",
+      "answer": "According to Source 2 (hr_policy.txt), employees are entitled to 10 days of paid sick leave per year.",
+      "chunks_retrieved": 3,
+      "top_chunk_score": 0.8463465,
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "grounded": true,
+      "unanswerable_handled": null,
+      "retrieval_latency_ms": 1126,
+      "llm_latency_ms": 1733,
+      "total_latency_ms": 2858
+    },
+    {
+      "question_id": "q3",
+      "question": "What is the total number of days off an employee gets?",
+      "difficulty": "medium",
+      "answer": "I used Source 1 (test_hr.txt) and Source 2 (hr_policy.txt) to answer this question.\n\nAccording to Source 1, employees get 20 days of leave per year, and according to Source 2, employees get 20 days of annual leave per year.\n\nThe total number of days off an employee gets is 20 days per year, as mentioned in both sources. \n\nNo further information is available from the provided sources, so this is the answer based on the available information.",
+      "chunks_retrieved": 3,
+      "top_chunk_score": 0.7403953,
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "grounded": true,
+      "unanswerable_handled": null,
+      "retrieval_latency_ms": 168,
+      "llm_latency_ms": 5961,
+      "total_latency_ms": 6129
+    },
+    {
+      "question_id": "q4",
+      "question": "What is the company vacation policy?",
+      "difficulty": "medium",
+      "answer": "I couldn't find the specific information about the company vacation policy in the provided sources. The sources only mention the leave policy, which includes annual leave and sick leave, but not vacation policy.\n\nSource used: Sources 1 and 2.",
+      "chunks_retrieved": 3,
+      "top_chunk_score": 0.6599405,
+      "recall_at_k": 1.0,
+      "mrr": 0.3333333333333333,
+      "grounded": true,
+      "unanswerable_handled": null,
+      "retrieval_latency_ms": 121,
+      "llm_latency_ms": 5932,
+      "total_latency_ms": 6053
+    },
+    {
+      "question_id": "q5",
+      "question": "What is the weather forecast for tomorrow?",
+      "difficulty": "unanswerable",
+      "answer": "I could not find relevant information to answer your question.",
+      "chunks_retrieved": 0,
+      "top_chunk_score": 0.0,
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "grounded": true,
+      "unanswerable_handled": true,
+      "retrieval_latency_ms": 114,
+      "llm_latency_ms": 0,
+      "total_latency_ms": 114
+    }
+  ]
+}

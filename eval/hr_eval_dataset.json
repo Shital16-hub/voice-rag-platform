@@ -1,0 +1,45 @@
+{
+  "dataset_name": "HR Agent Evaluation",
+  "agent_id": "d357a032-144f-48a4-91f7-3b2feb967dd0",
+  "questions": [
+    {
+      "id": "q1",
+      "question": "How many leave days do employees get per year?",
+      "expected_answer_contains": ["20 days", "20"],
+      "relevant_content": ["Employees get 20 days of leave per year"],
+      "difficulty": "easy"
+    },
+    {
+      "id": "q2",
+      "question": "How many sick leave days are employees entitled to?",
+      "expected_answer_contains": ["10 days", "10"],
+      "relevant_content": ["Sick leave is 10 days per year"],
+      "difficulty": "easy"
+    },
+    {
+      "id": "q3",
+      "question": "What is the total number of days off an employee gets?",
+      "expected_answer_contains": ["30", "20", "10"],
+      "relevant_content": [
+        "Employees get 20 days of leave per year",
+        "Sick leave is 10 days per year"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "id": "q4",
+      "question": "What is the company vacation policy?",
+      "expected_answer_contains": ["20 days", "leave"],
+      "relevant_content": ["Employees get 20 days of leave per year"],
+      "difficulty": "medium"
+    },
+    {
+      "id": "q5",
+      "question": "What is the weather forecast for tomorrow?",
+      "expected_answer_contains": [],
+      "relevant_content": [],
+      "difficulty": "unanswerable",
+      "expected_unanswerable": true
+    }
+  ]
+}
