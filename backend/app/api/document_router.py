@@ -4,6 +4,8 @@ from app.core.database import get_db
 from app.core.dependencies import require_admin, get_current_user
 from app.schemas.auth_schema import CurrentUser
 from app.schemas.document_schema import DocumentUploadResponse, DocumentStatusResponse
+from app.ingestion.ingestion_pipeline import run_ingestion
+
 from app.services.document_service import (
     validate_agent_belongs_to_tenant,
     save_upload_file,
@@ -122,3 +124,40 @@ async def get_status(
         chunk_count=document.chunk_count,
         created_at=document.created_at
     )
+
+
+@router.post("/{document_id}/ingest")
+async def ingest_document(
+    document_id: str,
+    current_user: CurrentUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Trigger ingestion for an uploaded document.
+    """
+    logger.info(
+        f"Ingestion triggered "
+        f"document_id={document_id} "
+        f"tenant_id={current_user.tenant_id}"
+    )
+
+    # verify document belongs to this tenant
+    document = await get_document_status(
+        document_id=document_id,
+        tenant_id=current_user.tenant_id,
+        db=db
+    )
+
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+
+    if document.ingestion_status == "completed":
+        return {"message": "Document already ingested"}
+
+    # run_ingestion now manages its own session
+    await run_ingestion(document_id=document_id)
+
+    return {"message": "Ingestion completed", "document_id": document_id}
