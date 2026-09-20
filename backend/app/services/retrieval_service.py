@@ -10,41 +10,37 @@ async def retrieve_relevant_chunks(
     question: str,
     tenant_id: str,
     agent_id: str,
-    top_k: int = 3
+    top_k: int = 3,
+    score_threshold: float = 0.5  # minimum similarity score
 ) -> list[dict]:
     """
     Search Qdrant for chunks most relevant to the question.
-    
-    Steps:
-    1. Convert question to embedding
-    2. Search Qdrant collection for this agent
-    3. Return top K most similar chunks
-    
-    tenant_id and agent_id together determine which
-    collection to search. This enforces isolation.
+    Only returns chunks above the score threshold.
     """
     logger.info(
         f"Retrieving chunks "
         f"agent_id={agent_id} "
         f"top_k={top_k} "
+        f"threshold={score_threshold} "
         f"question={question[:50]}"
     )
 
-    # Step 1: convert question to embedding
+    # convert question to embedding
     question_embedding = await get_embedding(question)
 
-    # Step 2: get collection name for this agent
+    # get collection name for this agent
     collection_name = get_collection_name(tenant_id, agent_id)
 
-    # Step 3: search Qdrant
+    # search Qdrant
     results = qdrant_client.search(
         collection_name=collection_name,
         query_vector=question_embedding,
         limit=top_k,
-        with_payload=True
+        with_payload=True,
+        score_threshold=score_threshold  # Qdrant filters below this
     )
 
-    # Step 4: format results
+    # format results
     chunks = []
     for result in results:
         chunk = {
@@ -61,5 +57,12 @@ async def retrieve_relevant_chunks(
             f"filename={result.payload['filename']}"
         )
 
-    logger.info(f"Retrieved {len(chunks)} chunks for question")
+    if not chunks:
+        logger.warning(
+            f"No chunks above threshold "
+            f"threshold={score_threshold} "
+            f"question={question[:50]}"
+        )
+
+    logger.info(f"Retrieved {len(chunks)} chunks above threshold={score_threshold}")
     return chunks
