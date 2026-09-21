@@ -130,3 +130,34 @@ class Message(Base):
 
     # relationships
     conversation = relationship("Conversation", back_populates="messages")
+
+
+class ApprovalRequest(Base):
+    __tablename__ = "approval_requests"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=new_uuid)
+    tenant_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False)
+    agent_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False)
+    conversation_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=True)
+    user_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False)
+
+    # what needs approval
+    tool_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    tool_input: Mapped[dict] = mapped_column(JSONB, nullable=True)
+
+    # the full agent state so we can resume
+    agent_state: Mapped[dict] = mapped_column(JSONB, nullable=True)
+
+    # approval decision
+    status: Mapped[str] = mapped_column(String(50), default="pending")
+    # pending / approved / rejected / expired
+
+    approved_by: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=True)
+    decision_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    decision_note: Mapped[str] = mapped_column(Text, nullable=True)
+
+    # expiry
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now)

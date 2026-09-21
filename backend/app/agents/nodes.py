@@ -12,6 +12,7 @@ from app.agents.tool_registry import (
 from app.services.retrieval_service import retrieve_relevant_chunks
 from app.services.llm_service import generate_answer
 from app.core.logger import get_logger
+from app.core.database import AsyncSessionLocal
 
 logger = get_logger(__name__)
 
@@ -234,12 +235,43 @@ async def generate_node(state: AgentState) -> AgentState:
 
 
 async def hitl_node(state: AgentState) -> AgentState:
-    logger.info("HITL node approval required")
-    tool_name = state.get("tool_name", "action")
-    answer = (
-        f"The action '{tool_name}' requires manager approval "
-        f"before it can be executed. "
-        f"A notification has been sent to your manager. "
-        f"You will be notified once a decision is made."
-    )
+    """
+    Human in the loop node.
+    Saves approval request to database.
+    Manager can approve/reject via API.
+    """
+    logger.info("HITL node - saving approval request")
+
+    tool_name = state.get("tool_name", "unknown")
+    tool_input = state.get("tool_input", {})
+
+    try:
+        async with AsyncSessionLocal() as db:
+            from app.services.hitl_service import create_approval_request
+            approval = await create_approval_request(
+                tenant_id=state["tenant_id"],
+                agent_id=state["agent_id"],
+                user_id=state["user_id"],
+                tool_name=tool_name,
+                tool_input=tool_input,
+                agent_state=dict(state),
+                conversation_id=state.get("conversation_id", "") or None,
+                db=db
+            )
+
+        answer = (
+            f"The action '{tool_name}' requires manager approval. "
+            f"Your request has been submitted (ID: {approval.id}). "
+            f"You will be notified once a decision is made. "
+            f"Approval expires in 24 hours."
+        )
+        logger.info(f"Approval request created id={approval.id}")
+
+    except Exception as e:
+        logger.error(f"Failed to create approval request error={e}")
+        answer = (
+            f"The action '{tool_name}' requires manager approval "
+            f"but we could not save the request. Please try again."
+        )
+
     return {**state, "answer": answer}
