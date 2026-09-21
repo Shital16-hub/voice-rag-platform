@@ -2,18 +2,11 @@ import time
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.models import Agent, Conversation, Message
-from app.services.retrieval_service import retrieve_relevant_chunks
-from app.services.llm_service import generate_answer
+from app.agents.generic_agent import generic_agent
 from app.schemas.chat_schema import ChatResponse, SourceChunk
 from app.core.logger import get_logger
 
 logger = get_logger(__name__)
-
-DEFAULT_SYSTEM_PROMPT = (
-    "You are a helpful assistant. "
-    "Answer questions based only on the provided sources. "
-    "If you cannot find the answer in the sources, say so clearly."
-)
 
 
 async def process_chat(
@@ -23,22 +16,9 @@ async def process_chat(
     user_id: str,
     db: AsyncSession
 ) -> ChatResponse:
-    """
-    Main chat flow:
-    1. Load agent to get system prompt
-    2. Retrieve relevant chunks
-    3. Generate answer with LLM
-    4. Save conversation and message
-    5. Return answer with sources
-    """
     start_time = time.time()
-    logger.info(
-        f"Chat request "
-        f"agent_id={agent_id} "
-        f"question={question[:50]}"
-    )
+    logger.info(f"Chat request agent_id={agent_id} question={question[:50]}")
 
-    # Step 1: load agent
     result = await db.execute(
         select(Agent).where(
             Agent.id == agent_id,
@@ -51,23 +31,40 @@ async def process_chat(
     if not agent:
         raise ValueError(f"Agent not found agent_id={agent_id}")
 
-    system_prompt = agent.system_prompt or DEFAULT_SYSTEM_PROMPT
+    tools_config = agent.tools_enabled or {}
+    if isinstance(tools_config, list):
+        builtin_tools = tools_config
+        mcp_servers = []
+    else:
+        builtin_tools = tools_config.get("builtin", [])
+        mcp_servers = tools_config.get("mcp_servers", [])
 
-    # Step 2: retrieve relevant chunks
-    chunks = await retrieve_relevant_chunks(
-        question=question,
-        tenant_id=tenant_id,
-        agent_id=agent_id
-    )
+    initial_state = {
+        "question": question,
+        "user_id": user_id,
+        "tenant_id": tenant_id,
+        "agent_id": agent_id,
+        "system_prompt": agent.system_prompt or "You are a helpful assistant.",
+        "tools_enabled": builtin_tools,
+        "mcp_servers": mcp_servers,
+        "retrieved_chunks": [],
+        "route": None,
+        "tool_name": None,
+        "tool_input": None,
+        "tool_result": None,
+        "requires_approval": False,
+        "approval_status": None,
+        "answer": None,
+        "error": None
+    }
 
-    # Step 3: generate answer
-    answer = await generate_answer(
-        question=question,
-        chunks=chunks,
-        system_prompt=system_prompt
-    )
+    logger.info(f"Running LangGraph agent tools={builtin_tools}")
+    final_state = await generic_agent.ainvoke(initial_state)
 
-    # Step 4: save conversation and message
+    answer = final_state.get("answer") or "I could not generate an answer."
+    chunks = final_state.get("retrieved_chunks", [])
+    route = final_state.get("route", "unknown")
+
     conversation = Conversation(
         tenant_id=tenant_id,
         agent_id=agent_id,
@@ -86,7 +83,7 @@ async def process_chat(
         content=answer,
         sources=[
             {
-                "chunk_id": c["chunk_id"],
+                "chunk_id": c.get("chunk_id", "tool"),
                 "filename": c["filename"],
                 "score": c["score"]
             }
@@ -97,13 +94,10 @@ async def process_chat(
     db.add(message)
     await db.commit()
 
-    logger.info(
-        f"Chat completed "
-        f"latency_ms={latency_ms} "
-        f"sources={len(chunks)}"
-    )
+    logger.info(f"Chat completed route={route} latency_ms={latency_ms}")
 
-    # Step 5: return response
+    real_chunks = [c for c in chunks if c.get("chunk_id") != "tool"]
+
     return ChatResponse(
         answer=answer,
         sources=[
@@ -114,7 +108,7 @@ async def process_chat(
                 chunk_index=c["chunk_index"],
                 score=c["score"]
             )
-            for c in chunks
+            for c in real_chunks
         ],
         conversation_id=conversation.id,
         message_id=message.id
