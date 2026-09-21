@@ -16,4 +16,5 @@ venv/
 *.log
 
 # Data
-uploads/
+uploads/backend/venv/
+backend/venv_new/
