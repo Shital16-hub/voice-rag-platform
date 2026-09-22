@@ -16,10 +16,6 @@ from app.core.database import AsyncSessionLocal
 
 logger = get_logger(__name__)
 
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "ollama")
-OLLAMA_PORT = os.environ.get("OLLAMA_PORT", "11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_LLM_MODEL", "llama3.2:3b")
-OLLAMA_URL = f"http://{OLLAMA_HOST}:{OLLAMA_PORT}"
 
 
 class RouteDecision(BaseModel):
@@ -90,27 +86,25 @@ async def extract_tool_input(
 
     prompt = f"""Extract parameters for tool "{tool_name}" from the question.
 
-Parameters:
+Parameters needed:
 {param_descriptions}
 
 Question: {question}
 
-Respond with ONLY a JSON object with extracted parameters."""
+Respond with ONLY a JSON object with extracted parameters. No explanation."""
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"{OLLAMA_URL}/api/chat",
-                json={
-                    "model": OLLAMA_MODEL,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "format": "json",
-                    "stream": False
-                }
-            )
-            response.raise_for_status()
-            content = response.json()["message"]["content"]
-            return json.loads(content)
+        from app.services.llm_service import call_groq
+        content = await call_groq([
+            {"role": "user", "content": prompt}
+        ])
+        # clean and parse JSON
+        content = content.strip()
+        if "```" in content:
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        return json.loads(content.strip())
     except Exception as e:
         logger.error(f"Tool input extraction failed error={e}")
         return {}

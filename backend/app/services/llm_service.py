@@ -4,41 +4,34 @@ from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 
-OLLAMA_URL = f"http://{settings.ollama_host}:{settings.ollama_port}"
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 
-def build_prompt(question: str, chunks: list[dict], system_prompt: str) -> str:
+def build_prompt(question: str, chunks: list[dict], system_prompt: str) -> list[dict]:
     """
-    Build the prompt we send to the LLM.
-    
-    We give the LLM:
-    1. A system instruction
-    2. The relevant chunks as context
-    3. The user question
-    
-    This is the core of RAG - grounding the LLM answer
-    in actual retrieved documents.
+    Build messages for the LLM.
+    Returns list of messages in OpenAI format.
+    Groq uses OpenAI compatible API.
     """
-    # format the chunks as numbered sources
+    # format chunks as context
     sources_text = ""
     for i, chunk in enumerate(chunks):
         sources_text += f"\nSource {i+1} ({chunk['filename']}):\n{chunk['content']}\n"
 
-    prompt = f"""{system_prompt}
-
-Use the following sources to answer the question.
+    user_message = f"""Use the following sources to answer the question.
 Only use information from the sources below.
-If the sources do not contain enough information, say so clearly.
+If the sources do not contain enough information say so clearly.
 Always mention which source you used.
 
 Sources:
 {sources_text}
 
-Question: {question}
+Question: {question}"""
 
-Answer:"""
-
-    return prompt
+    return [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_message}
+    ]
 
 
 async def generate_answer(
@@ -47,34 +40,62 @@ async def generate_answer(
     system_prompt: str
 ) -> str:
     """
-    Send prompt to Ollama LLM and get answer back.
+    Send prompt to Groq and get answer back.
+    Groq uses OpenAI compatible API format.
     """
     if not chunks:
         logger.warning("No chunks provided to LLM - returning default response")
         return "I could not find relevant information to answer your question."
 
-    prompt = build_prompt(question, chunks, system_prompt)
+    messages = build_prompt(question, chunks, system_prompt)
 
     logger.info(
-        f"Sending prompt to LLM "
-        f"model={settings.ollama_llm_model} "
+        f"Sending prompt to Groq "
+        f"model={settings.groq_llm_model} "
         f"chunks={len(chunks)}"
     )
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
-            f"{OLLAMA_URL}/api/chat",
+            GROQ_URL,
+            headers={
+                "Authorization": f"Bearer {settings.groq_api_key}",
+                "Content-Type": "application/json"
+            },
             json={
-                "model": settings.ollama_llm_model,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "stream": False
+                "model": settings.groq_llm_model,
+                "messages": messages,
+                "temperature": 0.1,
+                "max_tokens": 1024
             }
         )
         response.raise_for_status()
         data = response.json()
-        answer = data["message"]["content"]
+        answer = data["choices"][0]["message"]["content"]
 
-    logger.info(f"LLM answer generated length={len(answer)} chars")
+    logger.info(f"Groq answer generated length={len(answer)} chars")
     return answer
+
+
+async def call_groq(messages: list[dict]) -> str:
+    """
+    Generic Groq call for any messages.
+    Used by router and other nodes.
+    """
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.post(
+            GROQ_URL,
+            headers={
+                "Authorization": f"Bearer {settings.groq_api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": settings.groq_llm_model,
+                "messages": messages,
+                "temperature": 0.1,
+                "max_tokens": 512
+            }
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data["choices"][0]["message"]["content"]

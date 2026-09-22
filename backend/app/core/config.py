@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     app_secret_key: str
     app_debug: bool = False
 
+    groq_api_key: str
+    groq_llm_model: str = 'allam-2-7b'
+
+
     @property
     def database_url(self) -> str:
         return (
