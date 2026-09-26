@@ -112,7 +112,7 @@ async def test_unauthenticated_access_blocked():
             }
         )
 
-    assert response.status_code == 403
+    assert response.status_code == 401
     print("PASS: Unauthenticated access blocked")
 
 
