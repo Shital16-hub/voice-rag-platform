@@ -164,6 +164,10 @@ async def retrieve_node(state: AgentState) -> AgentState:
 
 
 async def tool_node(state: AgentState) -> AgentState:
+    """
+    Executes a tool call.
+    Supports both built-in tools and MCP tools.
+    """
     tool_name = state.get("tool_name")
     tool_input = state.get("tool_input", {})
 
@@ -172,6 +176,26 @@ async def tool_node(state: AgentState) -> AgentState:
     if not tool_name:
         return {**state, "route": "rag_only"}
 
+    # check if this is an MCP tool
+    mcp_servers = state.get("mcp_servers", [])
+    is_mcp_tool = False
+    mcp_server_url = None
+    mcp_auth_key = None
+
+    if mcp_servers:
+        from app.services.mcp_service import get_all_available_tools
+        all_tools = await get_all_available_tools(
+            state.get("tools_enabled", []),
+            mcp_servers
+        )
+        tool_info = all_tools.get(tool_name, {})
+        if tool_info.get("source") == "mcp":
+            is_mcp_tool = True
+            mcp_server_url = tool_info.get("mcp_server_url")
+            mcp_auth_key = tool_info.get("mcp_auth_key")
+
+    # check approval requirement
+    from app.agents.tool_registry import tool_requires_approval
     needs_approval = tool_requires_approval(tool_name)
 
     if needs_approval:
@@ -183,14 +207,28 @@ async def tool_node(state: AgentState) -> AgentState:
             "tool_result": None
         }
 
+    # execute tool
     try:
-        result = execute_builtin_tool(tool_name, tool_input)
-        logger.info(f"Tool executed successfully tool={tool_name}")
+        if is_mcp_tool and mcp_server_url:
+            from app.services.mcp_service import call_mcp_tool
+            result = await call_mcp_tool(
+                server_url=mcp_server_url,
+                tool_name=tool_name,
+                tool_input=tool_input,
+                auth_key=mcp_auth_key
+            )
+            logger.info(f"MCP tool executed tool={tool_name}")
+        else:
+            from app.agents.tool_registry import execute_builtin_tool
+            result = execute_builtin_tool(tool_name, tool_input)
+            logger.info(f"Built-in tool executed tool={tool_name}")
+
         return {
             **state,
             "tool_result": result,
             "requires_approval": False
         }
+
     except Exception as e:
         logger.error(f"Tool execution failed tool={tool_name} error={e}")
         return {
