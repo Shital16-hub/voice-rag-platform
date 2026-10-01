@@ -5,6 +5,8 @@ from app.core.dependencies import require_admin, get_current_user
 from app.schemas.auth_schema import CurrentUser
 from app.schemas.document_schema import DocumentUploadResponse, DocumentStatusResponse
 from app.ingestion.ingestion_pipeline import run_ingestion
+from app.models.models import Document, Agent
+from sqlalchemy import select
 
 from app.services.document_service import (
     validate_agent_belongs_to_tenant,
@@ -161,3 +163,39 @@ async def ingest_document(
     await run_ingestion(document_id=document_id)
 
     return {"message": "Ingestion completed", "document_id": document_id}
+
+@router.get("")
+async def list_documents(
+    agent_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    List all documents for an agent.
+    Enforces tenant isolation.
+    """
+    result = await db.execute(
+        select(Document).where(
+            Document.agent_id == agent_id,
+            Document.tenant_id == current_user.tenant_id
+        ).order_by(Document.created_at.desc())
+    )
+    documents = result.scalars().all()
+
+    logger.info(
+        f"Listed {len(documents)} documents "
+        f"agent_id={agent_id}"
+    )
+
+    return [
+        {
+            "id": d.id,
+            "filename": d.filename,
+            "file_type": d.file_type,
+            "ingestion_status": d.ingestion_status,
+            "chunk_count": d.chunk_count,
+            "file_size_bytes": d.file_size_bytes,
+            "created_at": d.created_at.isoformat()
+        }
+        for d in documents
+    ]
