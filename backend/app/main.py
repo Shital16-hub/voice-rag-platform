@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api import auth_router, document_router, chat_router, tenant_router, hitl_router, agent_router, conversation_router
+from app.api import auth_router, document_router, chat_router, tenant_router, hitl_router, agent_router, conversation_router, user_router
 from app.core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -17,6 +17,7 @@ app.include_router(tenant_router.router)
 app.include_router(hitl_router.router)
 app.include_router(agent_router.router)
 app.include_router(conversation_router.router)
+app.include_router(user_router.router)
 
 
 @app.get("/health")

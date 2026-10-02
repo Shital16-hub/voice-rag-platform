@@ -19,14 +19,18 @@ def build_prompt(question: str, chunks: list[dict], system_prompt: str) -> list[
         sources_text += f"\nSource {i+1} ({chunk['filename']}):\n{chunk['content']}\n"
 
     user_message = f"""Use the following sources to answer the question.
-Only use information from the sources below.
-If the sources do not contain enough information say so clearly.
-Always mention which source you used.
+        Be concise. Answer in 2-3 sentences maximum.
+        Do not explain your reasoning or show calculations.
+        Just give the direct answer.
+        If sources do not contain the answer say so clearly.
+        Always mention which source you used.
 
-Sources:
-{sources_text}
+        Sources:
+        {sources_text}
 
-Question: {question}"""
+        Question: {question}
+
+        Direct answer:"""
 
     return [
         {"role": "system", "content": system_prompt},
